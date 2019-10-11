@@ -1,32 +1,52 @@
 #include "main.h"
 
-/**
- * A callback function for LLEMU's center button.
- *
- * When this callback is fired, it will toggle line 2 of the LCD text between
- * "I was pressed!" and nothing.
- */
-void on_center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if (pressed) {
-		pros::lcd::set_text(2, "I was pressed!");
-	} else {
-		pros::lcd::clear_line(2);
-	}
-}
+#pragma region "Definitions"
 
+//Controller(s?)
+pros::Controller controller(pros::E_CONTROLLER_MASTER);
+
+//Drive motors
+pros::Motor drive_FR(0, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor drive_FL(1, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor drive_BR(2, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor drive_BL(3, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+
+//DR4B motors
+pros::Motor DR4B_L(4, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor DR4B_R(5, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
+
+//Claw - TODO: Change for 36:1 gearset
+pros::Motor claw(6, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+bool claw_open = false;
+const float CLAW_MAX_ROTATION = 300f;
+const float CLAW_CLOSED_ROTATION = 0f;
+//Spool - TODO: Change for 36:1 gearset
+pros::Motor spool(7, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+#pragma endregion
 /**
  * Runs initialization code. This occurs as soon as the program is started.
  *
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
-void initialize() {
-	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
 
-	pros::lcd::register_btn1_cb(on_center_button);
+void initialize()
+{
+	//All drive motors coast - reduce jerk
+	drive_FR.set_brake_mode(MOTOR_BRAKE_COAST);
+	drive_FL.set_brake_mode(MOTOR_BRAKE_COAST);
+	drive_BR.set_brake_mode(MOTOR_BRAKE_COAST);
+	drive_BL.set_brake_mode(MOTOR_BRAKE_COAST);
+
+	//DR4B set to hold - more stability
+	DR4B_L.set_brake_mode(MOTOR_BRAKE_HOLD);
+	DR4B_R.set_brake_mode(MOTOR_BRAKE_HOLD);
+
+	//Claw set to hold - tighter grip on cubes
+	claw.set_brake_mode(MOTOR_BRAKE_HOLD);
+
+	//Spool set to hold - more constant pressure
+	spool.set_brake_mode(MOTOR_BRAKE_HOLD);
 }
 
 /**
@@ -73,20 +93,47 @@ void autonomous() {}
  * operator control task will be stopped. Re-enabling the robot will restart the
  * task, not resume it from where it left off.
  */
-void opcontrol() {
-	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::Motor left_mtr(1);
-	pros::Motor right_mtr(2);
+void opcontrol()
+{
+	while (true)
+	{
+		printf("Claw: %d\n", claw.get_position());
 
-	while (true) {
-		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);
-		int left = master.get_analog(ANALOG_LEFT_Y);
-		int right = master.get_analog(ANALOG_RIGHT_Y);
+		// //Claw: toggle w/ A button
+		// //TODO:MEASURE THIS
+		// if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)))
+		// 	{
+		// 		claw_open = !claw_open;
+		// 	}
 
-		left_mtr = left;
-		right_mtr = right;
+		// if (claw_open)
+		// {
+		// 	claw.move_absolute(CLAW_MAX_ROTATION, 100);
+		// }
+		// else
+		// {
+		// 	claw.move_absolute(CLAW_CLOSED_ROTATION, 100);
+		// }
+
+		// //Spool: constant vel if claw closed
+		// if (!claw_open)
+		// {
+		// 	spool.move_velocity(100);
+		// }
+
+		// //DR4B: move w/ up/down directional buttons
+		// if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_UP)){
+		// 	DR4B_L.move(/*some positive amount scaled w/ the diff between the two*/);
+		// 	DR4B_R.move(/*some positive amount scaled w/ the diff between the two*/);
+		// }
+		// else if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)){
+		// 	DR4B_L.move(/*some negative amount scaled w/ the diff between the two*/);
+		// 	DR4B_R.move(/*some negative amount scaled w/ the diff between the two*/);
+		// }
+		// else{
+		// 	DR4B_L.move(0);
+		// 	DR4B_R.move(0);
+		// }
 		pros::delay(20);
 	}
 }
