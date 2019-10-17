@@ -3,7 +3,7 @@
 #pragma region "Definitions"
 
 //Controller(s?)
-pros::Controller controller(pros::E_CONTROLLER_MASTER);
+pros::Controller puppeteer(pros::E_CONTROLLER_MASTER);
 
 //Drive motors
 pros::Motor drive_FR(0, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
@@ -18,10 +18,28 @@ pros::Motor DR4B_R(5, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGR
 //Claw - TODO: Change for 36:1 gearset
 pros::Motor claw(6, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
 bool claw_open = false;
-const float CLAW_MAX_ROTATION = 300f;
-const float CLAW_CLOSED_ROTATION = 0f;
+const float CLAW_MAX_ROTATION = 45;
 //Spool - TODO: Change for 36:1 gearset
 pros::Motor spool(7, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+
+//Helper functions
+int limitAbs(int n, int max)
+{
+	int sign;
+	if (n > 0)
+	{
+		sign == 1;
+	}
+	else if (n < 0)
+	{
+		sign == -1;
+	}
+	else
+	{
+		return 0;
+	}
+	return std::min(max, abs(n)) * sign;
+}
 #pragma endregion
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -95,45 +113,61 @@ void autonomous() {}
  */
 void opcontrol()
 {
+	int leftPower = 0;
+	int rightPower = 0;
+	double DR4BOffset = 0;
 	while (true)
 	{
-		printf("Claw: %d\n", claw.get_position());
+		//Claw: toggle w/ A button
+		if (puppeteer.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A))
+		{
+			claw_open = !claw_open;
+		}
 
-		// //Claw: toggle w/ A button
-		// //TODO:MEASURE THIS
-		// if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)))
-		// 	{
-		// 		claw_open = !claw_open;
-		// 	}
+		if (claw_open)
+		{
+			claw.move_absolute(CLAW_MAX_ROTATION, 100);
+		}
+		else
+		{
+			claw.move_absolute(-5, 127);
+		}
 
-		// if (claw_open)
-		// {
-		// 	claw.move_absolute(CLAW_MAX_ROTATION, 100);
-		// }
-		// else
-		// {
-		// 	claw.move_absolute(CLAW_CLOSED_ROTATION, 100);
-		// }
+		//Spool: constant vel if claw closed
+		if (!claw_open)
+		{
+			spool.move_velocity(100);
+		}
 
-		// //Spool: constant vel if claw closed
-		// if (!claw_open)
-		// {
-		// 	spool.move_velocity(100);
-		// }
+		//DR4B: move w/ up/down directional buttons
+		//If the two sides become offset, the side that is ahead slows down to compensate.
+		DR4BOffset = DR4B_L.get_position() - DR4B_R.get_position();
+		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_UP))
+		{
+			DR4B_L.move(std::min((127 - DR4BOffset), 127));
+			DR4B_R.move(std::min((127 + DR4BOffset), 127));
+		}
+		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN))
+		{
+			DR4B_L.move(std::max((-127 + DR4BOffset), -127));
+			DR4B_R.move(std::max((-127 - DR4BOffset), -127));
+		}
+		else
+		{
+			DR4B_L.move(0);
+			DR4B_R.move(0);
+		}
 
-		// //DR4B: move w/ up/down directional buttons
-		// if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_UP)){
-		// 	DR4B_L.move(/*some positive amount scaled w/ the diff between the two*/);
-		// 	DR4B_R.move(/*some positive amount scaled w/ the diff between the two*/);
-		// }
-		// else if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)){
-		// 	DR4B_L.move(/*some negative amount scaled w/ the diff between the two*/);
-		// 	DR4B_R.move(/*some negative amount scaled w/ the diff between the two*/);
-		// }
-		// else{
-		// 	DR4B_L.move(0);
-		// 	DR4B_R.move(0);
-		// }
+		//Drive: Arcade drive split on two sticks: forward/back on left, turning on right
+		leftPower = limitAbs(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X), 127);
+		rightPower = limitAbs(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) - puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X), 127);
+
+		drive_FR.move(rightPower);
+		drive_BR.move(rightPower);
+
+		drive_FL.move(leftPower);
+		drive_BL.move(leftPower);
+
 		pros::delay(20);
 	}
 }
