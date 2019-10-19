@@ -1,26 +1,34 @@
 #include "main.h"
 
 #pragma region "Definitions"
+//Polling rate - used for calculations for gentler DR4B/drive
+const float POLL_RATE = 20.0;
 
 //Controller(s?)
 pros::Controller puppeteer(pros::E_CONTROLLER_MASTER);
 
 //Drive motors
-pros::Motor drive_FR(0, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor drive_FL(1, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor drive_BR(2, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor drive_BL(3, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor drive_FR(18, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor drive_FL(17, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor drive_BR(16, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor drive_BL(15, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+int leftPower = 0;
+int rightPower = 0;
 
 //DR4B motors
-pros::Motor DR4B_L(4, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor DR4B_R(5, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor DR4B_L(2, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor DR4B_R(1, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
+const double DR4B_ACCEL = 10.0;
+
+double DR4BOffset = 0;
+double DR4BVelocity = 0;
 
 //Claw - TODO: Change for 36:1 gearset
-pros::Motor claw(6, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor claw(10, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
 bool claw_open = false;
-const float CLAW_MAX_ROTATION = 45;
+const float CLAW_MAX_ROTATION = 215;
 //Spool - TODO: Change for 36:1 gearset
-pros::Motor spool(7, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor spool(3, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
 
 //Helper functions
 int limitAbs(int n, int max)
@@ -39,6 +47,10 @@ int limitAbs(int n, int max)
 		return 0;
 	}
 	return std::min(max, abs(n)) * sign;
+}
+
+double lerp(double a, double b, double t){
+	return a + t * (b - a);
 }
 #pragma endregion
 /**
@@ -60,8 +72,8 @@ void initialize()
 	DR4B_L.set_brake_mode(MOTOR_BRAKE_HOLD);
 	DR4B_R.set_brake_mode(MOTOR_BRAKE_HOLD);
 
-	//Claw set to hold - tighter grip on cubes
-	claw.set_brake_mode(MOTOR_BRAKE_HOLD);
+	//Claw set to coast - rubber bands provide most of the clamping force
+	claw.set_brake_mode(MOTOR_BRAKE_COAST);
 
 	//Spool set to hold - more constant pressure
 	spool.set_brake_mode(MOTOR_BRAKE_HOLD);
@@ -96,7 +108,25 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-void autonomous() {}
+void autonomous()
+{
+	//Deploy claw
+	drive_FR.move(127);
+	drive_FL.move(127);
+	drive_BR.move(127);
+	drive_BL.move(127);
+	pros::delay(250);
+	drive_FR.move(-127);
+	drive_FL.move(-127);
+	drive_BR.move(-127);
+	drive_BL.move(-127);
+	pros::delay(200);
+	drive_FR.move(0);
+	drive_FL.move(0);
+	drive_BR.move(0);
+	drive_BL.move(0);
+	
+}
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -113,54 +143,42 @@ void autonomous() {}
  */
 void opcontrol()
 {
-	int leftPower = 0;
-	int rightPower = 0;
-	double DR4BOffset = 0;
+
 	while (true)
 	{
-		//Claw: toggle w/ A button
-		if (puppeteer.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A))
-		{
-			claw_open = !claw_open;
+		//Claw: open w/ A button
+		if(puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_A) && claw.get_position() < CLAW_MAX_ROTATION){
+			claw.move(127);
 		}
-
-		if (claw_open)
-		{
-			claw.move_absolute(CLAW_MAX_ROTATION, 100);
+		else{
+			claw.move(0);
 		}
-		else
-		{
-			claw.move_absolute(-5, 127);
-		}
-
-		//Spool: constant vel if claw closed
-		if (!claw_open)
-		{
-			spool.move_velocity(100);
-		}
-
 		//DR4B: move w/ up/down directional buttons
 		//If the two sides become offset, the side that is ahead slows down to compensate.
 		DR4BOffset = DR4B_L.get_position() - DR4B_R.get_position();
 		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_UP))
 		{
-			DR4B_L.move(std::min((127 - DR4BOffset), 127));
-			DR4B_R.move(std::min((127 + DR4BOffset), 127));
+			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
+
+			DR4B_L.move(std::min((127 + DR4BOffset), 127.0));
+			DR4B_R.move(std::min((127 - DR4BOffset), 127.0));
 		}
 		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN))
 		{
-			DR4B_L.move(std::max((-127 + DR4BOffset), -127));
-			DR4B_R.move(std::max((-127 - DR4BOffset), -127));
+			// DR4BVelocity = lerp(DR4BVelocity, -127, (POLL_RATE * DR4B_ACCEL));
+			
+			DR4B_L.move(std::max((-64 - DR4BOffset), -64.0));
+			DR4B_R.move(std::max((-64 + DR4BOffset), -64.0));
 		}
 		else
 		{
-			DR4B_L.move(0);
-			DR4B_R.move(0);
+			DR4B_L.move(-DR4BOffset);
+			DR4B_R.move(DR4BOffset);
 		}
 
 		//Drive: Arcade drive split on two sticks: forward/back on left, turning on right
-		leftPower = limitAbs(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X), 127);
-		rightPower = limitAbs(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) - puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X), 127);
+		leftPower = puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+		rightPower = puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) - puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
 		drive_FR.move(rightPower);
 		drive_BR.move(rightPower);
@@ -168,6 +186,6 @@ void opcontrol()
 		drive_FL.move(leftPower);
 		drive_BL.move(leftPower);
 
-		pros::delay(20);
+		pros::delay(POLL_RATE);
 	}
 }
