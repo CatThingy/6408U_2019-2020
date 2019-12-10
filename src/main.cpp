@@ -8,39 +8,51 @@ const float POLL_RATE = 20.0;
 pros::Controller puppeteer(pros::E_CONTROLLER_MASTER);
 
 //Drive motors
-pros::Motor drive_FR(18, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor drive_FL(17, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor drive_BR(16, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor drive_BL(15, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+
+pros::Motor driveH(15, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor driveFR(14, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor driveFL(13, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor driveBR(12, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor driveBL(11, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
 int leftPower = 0;
 int rightPower = 0;
+/*
+    Maps from (-100) -> 100 to itself using the function
+    ((100 * pow(4, ((abs(x) - 50) / 12.5))) / (pow(4, ((abs(x) - 50) / 12.5))+1))) * ((x > 0) - (x < 0))
+
+    Used to ease in/out joystick movement for more precise control.
+
+    If the horizontal input is at 25%, it only has 5% of the power, reducing the
+    amount that the robot will slowly veer off course from an imperfect control
+    stick.
+*/
+int sigmoid_map[255] = {-100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -98, -98, -98, -98, -98, -98, -97, -97, -97, -96, -96, -96, -95, -95, -94, -94, -93, -92, -92, -91, -90, -89, -88, -86, -85, -84, -82, -80, -79, -77, -75, -73, -70, -68, -66, -63, -61, -58, -55, -52, -50, -47, -44, -41, -39, -36, -34, -31, -29, -27, -24, -22, -21, -19, -17, -16, -14, -13, -12, -10, -9, -8, -8, -7, -6, -5, -5, -4, -4, -3, -3, -3, -2, -2, -2, -2, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 16, 17, 19, 21, 22, 24, 27, 29, 31, 34, 36, 39, 41, 44, 47, 50, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 80, 82, 84, 85, 86, 88, 89, 90, 91, 92, 92, 93, 94, 94, 95, 95, 96, 96, 96, 97, 97, 97, 98, 98, 98, 98, 98, 98, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 
 //DR4B motors
-pros::Motor DR4B_L(2, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor DR4B_R(1, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor DR4BL(9, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor DR4BR(10, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
 const double DR4B_ACCEL = 10.0;
 
 double DR4BOffset = 0;
 double DR4BVelocity = 0;
 
-//Claw - TODO: Change for 36:1 gearset
-pros::Motor claw(10, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+//Claw
+pros::Motor claw(2, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
 bool claw_open = false;
-const float CLAW_MAX_ROTATION = 215;
-//Spool - TODO: Change for 36:1 gearset
-pros::Motor spool(3, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+const float CLAW_MAX_ROTATION = 360;
 
 //Helper functions
-int limitAbs(int n, int max)
+template <class T>
+T limitAbs(T n, T max)
 {
-	int sign;
+	T sign;
 	if (n > 0)
 	{
-		sign == 1;
+		sign = 1;
 	}
 	else if (n < 0)
 	{
-		sign == -1;
+		sign = -1;
 	}
 	else
 	{
@@ -49,8 +61,21 @@ int limitAbs(int n, int max)
 	return std::min(max, abs(n)) * sign;
 }
 
-double lerp(double a, double b, double t){
-	return a + t * (b - a);
+template <class T>
+T lerp(T a, T b, T w)
+{
+	return a + w * (b - a);
+}
+
+//Generalized PID controller
+double PID(double setpoint, double sensorValue, double &integral, double &prevError, double kP, double kI = 0, double kD = 0)
+{
+	double error = setpoint - sensorValue;
+	double derivative = error - prevError;
+
+	integral += error;
+	prevError = error;
+	return (error * kP) + (integral * kI) + (derivative * kP);
 }
 #pragma endregion
 /**
@@ -62,21 +87,19 @@ double lerp(double a, double b, double t){
 
 void initialize()
 {
-	//All drive motors coast - reduce jerk
-	drive_FR.set_brake_mode(MOTOR_BRAKE_COAST);
-	drive_FL.set_brake_mode(MOTOR_BRAKE_COAST);
-	drive_BR.set_brake_mode(MOTOR_BRAKE_COAST);
-	drive_BL.set_brake_mode(MOTOR_BRAKE_COAST);
+	//All drive motors hold - prevent being pushed around
+	driveFR.set_brake_mode(MOTOR_BRAKE_HOLD);
+	driveFL.set_brake_mode(MOTOR_BRAKE_HOLD);
+	driveBR.set_brake_mode(MOTOR_BRAKE_HOLD);
+	driveBL.set_brake_mode(MOTOR_BRAKE_HOLD);
+	driveH.set_brake_mode(MOTOR_BRAKE_HOLD);
 
 	//DR4B set to hold - more stability
-	DR4B_L.set_brake_mode(MOTOR_BRAKE_HOLD);
-	DR4B_R.set_brake_mode(MOTOR_BRAKE_HOLD);
+	DR4BL.set_brake_mode(MOTOR_BRAKE_HOLD);
+	DR4BR.set_brake_mode(MOTOR_BRAKE_HOLD);
 
-	//Claw set to coast - rubber bands provide most of the clamping force
-	claw.set_brake_mode(MOTOR_BRAKE_COAST);
-
-	//Spool set to hold - more constant pressure
-	spool.set_brake_mode(MOTOR_BRAKE_HOLD);
+	//Claw set to
+	claw.set_brake_mode(MOTOR_BRAKE_HOLD);
 }
 
 /**
@@ -111,21 +134,34 @@ void competition_initialize() {}
 void autonomous()
 {
 	//Deploy claw
-	drive_FR.move(127);
-	drive_FL.move(127);
-	drive_BR.move(127);
-	drive_BL.move(127);
+	driveFR.move(127);
+	driveFL.move(127);
+	driveBR.move(127);
+	driveBL.move(127);
 	pros::delay(250);
-	drive_FR.move(-127);
-	drive_FL.move(-127);
-	drive_BR.move(-127);
-	drive_BL.move(-127);
+	driveFR.move(-127);
+	driveFL.move(-127);
+	driveBR.move(-127);
+	driveBL.move(-127);
 	pros::delay(200);
-	drive_FR.move(0);
-	drive_FL.move(0);
-	drive_BR.move(0);
-	drive_BL.move(0);
-	
+	driveFR.move(0);
+	driveFL.move(0);
+	driveBR.move(0);
+	driveBL.move(0);
+
+	//drive forward
+	//raise dr4b
+	//drive forward
+	//lower dr4b
+	//open claw
+	//lower dr4b to ground
+	//close claw
+	//turn
+	//drive to goal
+	//open claw
+	//raise dr4b
+	//back off
+	//lower dr4b
 }
 
 /**
@@ -146,46 +182,62 @@ void opcontrol()
 
 	while (true)
 	{
-		//Claw: open w/ A button
-		if(puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_A) && claw.get_position() < CLAW_MAX_ROTATION){
+		//Claw: open/close w/ right triggers
+		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && claw.get_position() < CLAW_MAX_ROTATION)
+		{
 			claw.move(127);
 		}
-		else{
+		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_L2) && claw.get_position() > -30)
+		{
+			claw.move(-127);
+		}
+		else
+		{
 			claw.move(0);
 		}
 		//DR4B: move w/ up/down directional buttons
 		//If the two sides become offset, the side that is ahead slows down to compensate.
-		DR4BOffset = DR4B_L.get_position() - DR4B_R.get_position();
-		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_UP))
+		DR4BOffset = DR4BL.get_position() - DR4BR.get_position();
+		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_R2))
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4B_L.move(std::min((127 + DR4BOffset), 127.0));
-			DR4B_R.move(std::min((127 - DR4BOffset), 127.0));
+			DR4BL.move(std::min((127 + DR4BOffset), 127.0));
+			DR4BR.move(std::min((127 - DR4BOffset), 127.0));
 		}
-		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN))
+		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_R1))
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, -127, (POLL_RATE * DR4B_ACCEL));
-			
-			DR4B_L.move(std::max((-64 - DR4BOffset), -64.0));
-			DR4B_R.move(std::max((-64 + DR4BOffset), -64.0));
+
+			DR4BL.move(std::max((-64 - DR4BOffset), -64.0));
+			DR4BR.move(std::max((-64 + DR4BOffset), -64.0));
 		}
 		else
 		{
-			DR4B_L.move(-DR4BOffset);
-			DR4B_R.move(DR4BOffset);
+			if (DR4BOffset > 0)
+			{
+				DR4BL.move(0);
+				DR4BR.move(DR4BOffset * 2);
+			}
+			else
+			{
+				DR4BL.move(-DR4BOffset * 2);
+				DR4BR.move(0);
+			}
 		}
 
 		//Drive: Arcade drive split on two sticks: forward/back on left, turning on right
-		leftPower = puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
-		rightPower = puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) - puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+		leftPower = sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + 127] + sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X) + 127];
+		rightPower = sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + 127] - sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X) + 127];
 
-		drive_FR.move(rightPower);
-		drive_BR.move(rightPower);
+		driveFR.move(rightPower);
+		driveBR.move(rightPower);
 
-		drive_FL.move(leftPower);
-		drive_BL.move(leftPower);
+		driveFL.move(leftPower);
+		driveBL.move(leftPower);
 
+		//H-drive on horizontal axis of left control stick
+		driveH.move(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X));
 		pros::delay(POLL_RATE);
 	}
 }
