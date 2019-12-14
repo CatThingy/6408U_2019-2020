@@ -14,6 +14,8 @@ pros::Motor driveFR(14, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DE
 pros::Motor driveFL(13, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
 pros::Motor driveBR(12, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
 pros::Motor driveBL(11, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+bool slowedMovement = false;
+
 int leftPower = 0;
 int rightPower = 0;
 /*
@@ -32,7 +34,7 @@ int sigmoid_map[255] = {-100, -100, -100, -100, -100, -100, -100, -100, -100, -1
 pros::Motor DR4BL(9, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
 pros::Motor DR4BR(10, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
 const double DR4B_ACCEL = 10.0;
-const double DR4B_MAX = 540.0;
+const double DR4B_MAX = 595.0;
 double DR4BOffset = 0;
 double DR4BVelocity = 0;
 
@@ -202,8 +204,8 @@ void opcontrol()
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(std::min((127 + DR4BOffset), 127.0));
-			DR4BR.move(std::min((127 - DR4BOffset), 127.0));
+			DR4BL.move(std::min((127 + DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
+			DR4BR.move(std::min((127 - DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
 		}
 		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_R1))
 		{
@@ -230,14 +232,16 @@ void opcontrol()
 		leftPower = sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + 127] + sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X) + 127];
 		rightPower = sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + 127] - sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X) + 127];
 
-		driveFR.move(rightPower);
-		driveBR.move(rightPower);
+		driveFR.move(rightPower * (slowedMovement ? 0.5 : 1));
+		driveBR.move(rightPower * (slowedMovement ? 0.5 : 1));
 
-		driveFL.move(leftPower);
-		driveBL.move(leftPower);
+		driveFL.move(leftPower * (slowedMovement ? 0.5 : 1));
+		driveBL.move(leftPower * (slowedMovement ? 0.5 : 1));
 
 		//H-drive on horizontal axis of left control stick
-		driveH.move(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X));
+		driveH.move(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X) * (slowedMovement ? 0.5 : 1));
+
+		slowedMovement = puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_A);
 		pros::delay(POLL_RATE);
 	}
 }
