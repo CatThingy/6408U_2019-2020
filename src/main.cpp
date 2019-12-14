@@ -32,7 +32,7 @@ int sigmoid_map[255] = {-100, -100, -100, -100, -100, -100, -100, -100, -100, -1
 pros::Motor DR4BL(9, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
 pros::Motor DR4BR(10, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
 const double DR4B_ACCEL = 10.0;
-
+const double DR4B_MAX = 540.0;
 double DR4BOffset = 0;
 double DR4BVelocity = 0;
 
@@ -98,7 +98,7 @@ void initialize()
 	DR4BL.set_brake_mode(MOTOR_BRAKE_HOLD);
 	DR4BR.set_brake_mode(MOTOR_BRAKE_HOLD);
 
-	//Claw set to
+	//Claw set to hold - prevent claw from being forced open
 	claw.set_brake_mode(MOTOR_BRAKE_HOLD);
 }
 
@@ -198,7 +198,7 @@ void opcontrol()
 		//DR4B: move w/ up/down directional buttons
 		//If the two sides become offset, the side that is ahead slows down to compensate.
 		DR4BOffset = DR4BL.get_position() - DR4BR.get_position();
-		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_R2))
+		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
 
