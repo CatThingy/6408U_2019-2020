@@ -141,17 +141,25 @@ void autonomous()
 	driveBR.move(127);
 	driveBL.move(127);
 	pros::delay(250);
+	//Pushbot preload cube into scoring zone - 1 point
 	driveFR.move(-127);
 	driveFL.move(-127);
 	driveBR.move(-127);
 	driveBL.move(-127);
-	pros::delay(200);
+	pros::delay(2000);
+	//Stop touching cube
+	driveFR.move(127);
+	driveFL.move(127);
+	driveBR.move(127);
+	driveBL.move(127);
+	pros::delay(500);
 	driveFR.move(0);
 	driveFL.move(0);
 	driveBR.move(0);
 	driveBL.move(0);
 
 	//drive forward
+
 	//raise dr4b
 	//drive forward
 	//lower dr4b
@@ -181,7 +189,9 @@ void autonomous()
  */
 void opcontrol()
 {
-
+	double timeStart = pros::millis();
+	bool rumbled15s = false;
+	bool rumbled30s = false;
 	while (true)
 	{
 		//Claw: open/close w/ right triggers
@@ -238,9 +248,21 @@ void opcontrol()
 		driveFL.move(leftPower * (slowedMovement ? 0.5 : 1));
 		driveBL.move(leftPower * (slowedMovement ? 0.5 : 1));
 
-		//H-drive on horizontal axis of left control stick
+		//H-drive on horizontal axis of left control stick	
 		driveH.move(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X) * (slowedMovement ? 0.5 : 1));
-
+		//Rumble at 30s remaining
+		if (pros::millis() - timeStart > 75 * 1000 && !rumbled30s)
+		{
+			puppeteer.rumble("_ _ _");
+			rumbled15s = true;
+		}
+		
+		//Rumble at 15s remaining
+		if (pros::millis() - timeStart > 90 * 1000 && !rumbled15s)
+		{
+			puppeteer.rumble(".. .. ..");
+			rumbled15s = true;
+		}
 		slowedMovement = puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_A);
 		pros::delay(POLL_RATE);
 	}
