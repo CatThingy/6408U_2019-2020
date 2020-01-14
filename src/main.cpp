@@ -19,14 +19,15 @@ bool slowedMovement = false;
 int leftPower = 0;
 int rightPower = 0;
 /*
-    Maps from (-100) -> 100 to itself using the function
-    ((100 * pow(4, ((abs(x) - 50) / 12.5))) / (pow(4, ((abs(x) - 50) / 12.5))+1))) * ((x > 0) - (x < 0))
+	Maps from (-127) -> 127 to (-100) -> 100 using the function
+	((100 * pow(4, ((abs(x) - 50) / 12.5))) / (pow(4, ((abs(x) - 50) / 12.5))+1))) * ((x > 0) - (x < 0))
+	https://www.desmos.com/calculator/w7dktkaote
 
-    Used to ease in/out joystick movement for more precise control.
+	Used to ease in/out joystick movement for more precise control.
 
-    If the horizontal input is at 25%, it only has 5% of the power, reducing the
-    amount that the robot will slowly veer off course from an imperfect control
-    stick.
+	If the horizontal input is at 25%, it only has 5% of the power, reducing the
+	amount that the robot will slowly veer off course from an imperfect control
+	stick.
 */
 int sigmoid_map[255] = {-100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -98, -98, -98, -98, -98, -98, -97, -97, -97, -96, -96, -96, -95, -95, -94, -94, -93, -92, -92, -91, -90, -89, -88, -86, -85, -84, -82, -80, -79, -77, -75, -73, -70, -68, -66, -63, -61, -58, -55, -52, -50, -47, -44, -41, -39, -36, -34, -31, -29, -27, -24, -22, -21, -19, -17, -16, -14, -13, -12, -10, -9, -8, -8, -7, -6, -5, -5, -4, -4, -3, -3, -3, -2, -2, -2, -2, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 16, 17, 19, 21, 22, 24, 27, 29, 31, 34, 36, 39, 41, 44, 47, 50, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 80, 82, 84, 85, 86, 88, 89, 90, 91, 92, 92, 93, 94, 94, 95, 95, 96, 96, 96, 97, 97, 97, 98, 98, 98, 98, 98, 98, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 
@@ -73,11 +74,66 @@ T lerp(T a, T b, T w)
 double PID(double setpoint, double sensorValue, double &integral, double &prevError, double kP, double kI = 0, double kD = 0)
 {
 	double error = setpoint - sensorValue;
-	double derivative = error - prevError;
+	double derivative = 0;
 
-	integral += error;
+	if (kD != 0)
+	{
+		derivative = error - prevError;
+	}
+	if (kI != 0)
+	{
+		integral += error;
+	}
 	prevError = error;
 	return (error * kP) + (integral * kI) + (derivative * kP);
+}
+/** Moves a certain amount of degrees for left and right using a PID controller
+ * \param leftAmt Number of degrees to turn the left wheels
+ * \param rightAmt Number of degrees to turn the right wheels
+ * \param rpm Max RPM to spin the wheels at
+ * \param tolerance Maximum acceptable error in degrees
+ * \param targetTicks Amount of time the wheels have to be within the tolerance
+ * \param kPDrive kP for drive motors
+ * \param kIDrive kI for drive motors
+ * \param kDDrive kD for drive motors
+ */
+void PIDMove(double leftAmt, double rightAmt, double rpm, double tolerance, int targetTicks, double kPDrive, double kIDrive = 0, double kDDrive = 0)
+{
+	double FRTarget = driveFR.get_position() + rightAmt;
+	double FLTarget = driveFL.get_position() + leftAmt;
+	double BRTarget = driveBR.get_position() + rightAmt;
+	double BLTarget = driveBL.get_position() + leftAmt;
+
+	double FRDerivative = 0;
+	double FLDerivative = 0;
+	double BRDerivative = 0;
+	double BLDerivative = 0;
+
+	double FRPrevError = 0;
+	double FLPrevError = 0;
+	double BRPrevError = 0;
+	double BLPrevError = 0;
+
+	bool atTarget = false;
+	int ticksAtTarget = 0;
+	while (!atTarget && ticksAtTarget <= targetTicks)
+	{
+		driveFR.move_velocity(limitAbs(PID(FRTarget, driveFR.get_position(), FRDerivative, FRPrevError, kPDrive), rpm));
+		driveFL.move_velocity(limitAbs(PID(FRTarget, driveFR.get_position(), FRDerivative, FRPrevError, kPDrive), rpm));
+		driveBR.move_velocity(limitAbs(PID(FRTarget, driveFR.get_position(), FRDerivative, FRPrevError, kPDrive), rpm));
+		driveBL.move_velocity(limitAbs(PID(FRTarget, driveFR.get_position(), FRDerivative, FRPrevError, kPDrive), rpm));
+
+		atTarget = (std::abs(driveFR.get_position() - FRTarget) < tolerance) && (std::abs(driveFL.get_position() - FLTarget) < tolerance) && (std::abs(driveBR.get_position() - BRTarget) < tolerance) && (std::abs(driveBL.get_position() - BLTarget) < tolerance);
+		if (atTarget)
+		{
+			ticksAtTarget++;
+		}
+		else
+		{
+			ticksAtTarget = 0;
+		}
+		pros::delay(POLL_RATE);
+	}
 }
 #pragma endregion
 /**
@@ -248,7 +304,7 @@ void opcontrol()
 		driveFL.move(leftPower * (slowedMovement ? 0.5 : 1));
 		driveBL.move(leftPower * (slowedMovement ? 0.5 : 1));
 
-		//H-drive on horizontal axis of left control stick	
+		//H-drive on horizontal axis of left control stick
 		driveH.move(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X) * (slowedMovement ? 0.5 : 1));
 		//Rumble at 30s remaining
 		if (pros::millis() - timeStart > 75 * 1000 && !rumbled30s)
@@ -256,7 +312,7 @@ void opcontrol()
 			puppeteer.rumble("_ _ _");
 			rumbled15s = true;
 		}
-		
+
 		//Rumble at 15s remaining
 		if (pros::millis() - timeStart > 90 * 1000 && !rumbled15s)
 		{
