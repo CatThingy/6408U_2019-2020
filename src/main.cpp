@@ -21,7 +21,7 @@ int rightPower = 0;
 /*
 	Maps from (-127) -> 127 to (-100) -> 100 using the function
 	((100 * pow(4, ((abs(x) - 50) / 12.5))) / (pow(4, ((abs(x) - 50) / 12.5))+1))) * ((x > 0) - (x < 0))
-	https://www.desmos.com/calculator/w7dktkaote
+	https://www.desmos	.com/calculator/w7dktkaote
 
 	Used to ease in/out joystick movement for more precise control.
 
@@ -32,8 +32,8 @@ int rightPower = 0;
 int sigmoid_map[255] = {-100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -98, -98, -98, -98, -98, -98, -97, -97, -97, -96, -96, -96, -95, -95, -94, -94, -93, -92, -92, -91, -90, -89, -88, -86, -85, -84, -82, -80, -79, -77, -75, -73, -70, -68, -66, -63, -61, -58, -55, -52, -50, -47, -44, -41, -39, -36, -34, -31, -29, -27, -24, -22, -21, -19, -17, -16, -14, -13, -12, -10, -9, -8, -8, -7, -6, -5, -5, -4, -4, -3, -3, -3, -2, -2, -2, -2, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 16, 17, 19, 21, 22, 24, 27, 29, 31, 34, 36, 39, 41, 44, 47, 50, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 80, 82, 84, 85, 86, 88, 89, 90, 91, 92, 92, 93, 94, 94, 95, 95, 96, 96, 96, 97, 97, 97, 98, 98, 98, 98, 98, 98, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 
 //DR4B motors
-pros::Motor DR4BL(18, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor DR4BR(17, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor DR4BL(18, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor DR4BR(17, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
 const double DR4B_ACCEL = 10.0;
 const double DR4B_MAX = 595.0;
 double DR4BOffset = 0;
@@ -138,7 +138,6 @@ void PIDMove(double leftAmt, double rightAmt, double rpm, double tolerance, int 
 	driveFL.move(0);
 	driveBR.move(0);
 	driveBL.move(0);
-	// puppeteer.set_text(0, 0, "TEST");
 }
 #pragma endregion
 /**
@@ -195,44 +194,53 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous()
-{
-	//Deploy claw
-	driveFR.move(64);
-	driveFL.move(64);
-	driveBR.move(64);
-	driveBL.move(64);
-	pros::delay(64);
+{ //Deploy claw and move DR4B above first cube
+	DR4BR.move_absolute(90, 100);
+	DR4BL.move_absolute(90, 100);
 
-	driveFR.move(-64);
-	driveFL.move(-64);
-	driveBR.move(-64);
-	driveBL.move(-64);
-	pros::delay(300);
+	//Move so the cube is under the claw
+	PIDMove(140, 140, 100, 1, 10, 1.0);
 
-	driveFR.move(0);
-	driveFL.move(0);
-	driveBR.move(0);
-	driveBL.move(0);
-	pros::delay(150);
+	//Grab the cube
+	claw.move_absolute(CLAW_MAX_ROTATION, 100);
+	pros::delay(500);
+	DR4BR.move_absolute(0, 50);
+	DR4BL.move_absolute(0, 50);
+	pros::delay(400);
+	claw.move_velocity(-100);
 
-	DR4BR.move_relative(-180, 100);
-	DR4BL.move_relative(-180, 100);
-	PIDMove(150, 150, 150, 10, 5, 1.0);
+	pros::delay(750);
 
-	//drive forward
+	claw.move_velocity(0);
 
-	//raise dr4b
-	//drive forward
-	//lower dr4b
-	//open claw
-	//lower dr4b to ground
-	//close claw
-	//turn
-	//drive to goal
-	//open claw
-	//raise dr4b
-	//back off
-	//lower dr4b
+	//Raise DR4B above tower of 4
+	DR4BL.move_absolute(390, 100);
+	DR4BR.move_absolute(390, 100);
+
+	pros::delay(500);
+
+	//Drive towards tower of 4
+	PIDMove(653, 653, 75, 1, 10, 1.0);
+
+	//Start lowering onto tower of 4
+	DR4BL.move_absolute(270, 30);
+	DR4BR.move_absolute(270, 30);
+	pros::delay(750);
+
+	//Open claw
+	claw.move_absolute(CLAW_MAX_ROTATION, 100);
+	
+	pros::delay(500);
+	
+	//Move to bottom
+	DR4BL.move_absolute(0, 15);
+	DR4BR.move_absolute(0, 15);
+
+	pros::delay(1500);
+	//Grab on
+	claw.move_velocity(-100);
+	pros::delay(500);
+	claw.move_velocity(0);
 }
 
 /**
@@ -314,8 +322,8 @@ void opcontrol()
 		//Rumble at 30s remaining
 		if (pros::millis() - timeStart > 75 * 1000 && !rumbled30s)
 		{
-			puppeteer.rumble("_ _ _");
-			rumbled15s = true;
+			puppeteer.rumble("- - -");
+			rumbled30s = true;
 		}
 
 		//Rumble at 15s remaining
