@@ -21,7 +21,7 @@ int rightPower = 0;
 /*
 	Maps from (-127) -> 127 to (-100) -> 100 using the function
 	((100 * pow(4, ((abs(x) - 50) / 12.5))) / (pow(4, ((abs(x) - 50) / 12.5))+1))) * ((x > 0) - (x < 0))
-	https://www.desmos	.com/calculator/w7dktkaote
+	https://www.desmos.com/calculator/w7dktkaote
 
 	Used to ease in/out joystick movement for more precise control.
 
@@ -39,10 +39,12 @@ const double DR4B_MAX = 595.0;
 double DR4BOffset = 0;
 double DR4BVelocity = 0;
 
-//Claw
-pros::Motor claw(2, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
-bool claw_open = false;
-const float CLAW_MAX_ROTATION = 360;
+//Intake
+pros::Motor Intake(2, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
+
+//Sensors
+pros::ADIUltrasonic rangeL('A', 'B');
+pros::ADIUltrasonic rangeR('A', 'B');
 
 //Helper functions
 template <class T>
@@ -160,8 +162,8 @@ void initialize()
 	DR4BL.set_brake_mode(MOTOR_BRAKE_HOLD);
 	DR4BR.set_brake_mode(MOTOR_BRAKE_HOLD);
 
-	//Claw set to hold - prevent claw from being forced open
-	claw.set_brake_mode(MOTOR_BRAKE_HOLD);
+	//Intake set to hold - prevent cubes from being forced out
+	Intake.set_brake_mode(MOTOR_BRAKE_HOLD);
 }
 
 /**
@@ -194,53 +196,22 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous()
-{ //Deploy claw and move DR4B above first cube
-	DR4BR.move_absolute(90, 100);
-	DR4BL.move_absolute(90, 100);
-
-	//Move so the cube is under the claw
-	PIDMove(140, 140, 100, 1, 10, 1.0);
-
-	//Grab the cube
-	claw.move_absolute(CLAW_MAX_ROTATION, 100);
-	pros::delay(500);
-	DR4BR.move_absolute(0, 50);
-	DR4BL.move_absolute(0, 50);
-	pros::delay(400);
-	claw.move_velocity(-100);
-
-	pros::delay(750);
-
-	claw.move_velocity(0);
-
-	//Raise DR4B above tower of 4
-	DR4BL.move_absolute(390, 100);
-	DR4BR.move_absolute(390, 100);
-
-	pros::delay(500);
-
-	//Drive towards tower of 4
-	PIDMove(653, 653, 75, 1, 10, 1.0);
-
-	//Start lowering onto tower of 4
-	DR4BL.move_absolute(270, 30);
-	DR4BR.move_absolute(270, 30);
-	pros::delay(750);
-
-	//Open claw
-	claw.move_absolute(CLAW_MAX_ROTATION, 100);
-	
-	pros::delay(500);
-	
-	//Move to bottom
-	DR4BL.move_absolute(0, 15);
-	DR4BR.move_absolute(0, 15);
-
-	pros::delay(1500);
-	//Grab on
-	claw.move_velocity(-100);
-	pros::delay(500);
-	claw.move_velocity(0);
+{
+	//One-point auto
+	driveBL.move_velocity(-200);
+	driveBR.move_velocity(-200);
+	driveFL.move_velocity(-200);
+	driveFR.move_velocity(-200);
+	pros::delay(4000);
+	driveBL.move_velocity(200);
+	driveBR.move_velocity(200);
+	driveFL.move_velocity(200);
+	driveFR.move_velocity(200);
+	pros::delay(1000);
+	driveBL.move_velocity(-0);
+	driveBR.move_velocity(0);
+	driveFL.move_velocity(0);
+	driveFR.move_velocity(0);
 }
 
 /**
@@ -261,20 +232,27 @@ void opcontrol()
 	double timeStart = pros::millis();
 	bool rumbled15s = false;
 	bool rumbled30s = false;
+	lv_obj_t *lRange = lv_label_create(lv_scr_act(), nullptr);
+	lv_obj_t *rRange = lv_label_create(lv_scr_act(), nullptr);
 	while (true)
 	{
-		//Claw: open/close w/ right triggers
-		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && claw.get_position() < CLAW_MAX_ROTATION)
+		if (pros::millis() % 2 == 0)
 		{
-			claw.move(127);
+			lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
+			lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
 		}
-		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_L2) && claw.get_position() > -30)
+		//Intake/outtake with L/R triggers
+		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
 		{
-			claw.move(-127);
+			Intake.move(127);
+		}
+		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
+		{
+			Intake.move(-127);
 		}
 		else
 		{
-			claw.move(0);
+			Intake.move(0);
 		}
 		//DR4B: move w/ up/down directional buttons
 		//If the two sides become offset, the side that is ahead slows down to compensate.
