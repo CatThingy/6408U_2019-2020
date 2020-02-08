@@ -1,19 +1,19 @@
 #include "main.h"
-
+using namespace pros;
 #pragma region "Definitions"
 //Polling rate - used for calculations for gentler DR4B/drive
 const float POLL_RATE = 20.0;
 
 //Controller(s?)
-pros::Controller puppeteer(pros::E_CONTROLLER_MASTER);
+Controller puppeteer(E_CONTROLLER_MASTER);
 
 //Drive motors
 
-pros::Motor driveH(15, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor driveFR(14, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor driveFL(13, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor driveBR(12, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor driveBL(11, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+Motor driveH(15, E_MOTOR_GEARSET_18, true, E_MOTOR_ENCODER_DEGREES);
+Motor driveFR(14, E_MOTOR_GEARSET_18, true, E_MOTOR_ENCODER_DEGREES);
+Motor driveFL(13, E_MOTOR_GEARSET_18, false, E_MOTOR_ENCODER_DEGREES);
+Motor driveBR(12, E_MOTOR_GEARSET_18, true, E_MOTOR_ENCODER_DEGREES);
+Motor driveBL(11, E_MOTOR_GEARSET_18, false, E_MOTOR_ENCODER_DEGREES);
 bool slowedMovement = false;
 
 int leftPower = 0;
@@ -32,19 +32,19 @@ int rightPower = 0;
 int sigmoid_map[255] = {-100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -98, -98, -98, -98, -98, -98, -97, -97, -97, -96, -96, -96, -95, -95, -94, -94, -93, -92, -92, -91, -90, -89, -88, -86, -85, -84, -82, -80, -79, -77, -75, -73, -70, -68, -66, -63, -61, -58, -55, -52, -50, -47, -44, -41, -39, -36, -34, -31, -29, -27, -24, -22, -21, -19, -17, -16, -14, -13, -12, -10, -9, -8, -8, -7, -6, -5, -5, -4, -4, -3, -3, -3, -2, -2, -2, -2, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 16, 17, 19, 21, 22, 24, 27, 29, 31, 34, 36, 39, 41, 44, 47, 50, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 80, 82, 84, 85, 86, 88, 89, 90, 91, 92, 92, 93, 94, 94, 95, 95, 96, 96, 96, 97, 97, 97, 98, 98, 98, 98, 98, 98, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 
 //DR4B motors
-pros::Motor DR4BL(18, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor DR4BR(17, pros::E_MOTOR_GEARSET_36, false, pros::E_MOTOR_ENCODER_DEGREES);
+Motor DR4BL(18, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
+Motor DR4BR(17, E_MOTOR_GEARSET_36, false, E_MOTOR_ENCODER_DEGREES);
 const double DR4B_ACCEL = 10.0;
 const double DR4B_MAX = 595.0;
 double DR4BOffset = 0;
 double DR4BVelocity = 0;
 
 //Intake
-pros::Motor Intake(2, pros::E_MOTOR_GEARSET_36, true, pros::E_MOTOR_ENCODER_DEGREES);
+Motor Intake(2, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
 
 //Sensors
-pros::ADIUltrasonic rangeL('A', 'B');
-pros::ADIUltrasonic rangeR('A', 'B');
+ADIUltrasonic rangeL('A', 'B');
+ADIUltrasonic rangeR('C', 'D');
 
 //Helper functions
 template <class T>
@@ -134,7 +134,7 @@ void PIDMove(double leftAmt, double rightAmt, double rpm, double tolerance, int 
 		{
 			ticksAtTarget = 0;
 		}
-		pros::delay(POLL_RATE);
+		delay(POLL_RATE);
 	}
 	driveFR.move(0);
 	driveFL.move(0);
@@ -202,12 +202,12 @@ void autonomous()
 	driveBR.move_velocity(-200);
 	driveFL.move_velocity(-200);
 	driveFR.move_velocity(-200);
-	pros::delay(4000);
+	delay(4000);
 	driveBL.move_velocity(200);
 	driveBR.move_velocity(200);
 	driveFL.move_velocity(200);
 	driveFR.move_velocity(200);
-	pros::delay(1000);
+	delay(1000);
 	driveBL.move_velocity(-0);
 	driveBR.move_velocity(0);
 	driveFL.move_velocity(0);
@@ -229,24 +229,22 @@ void autonomous()
  */
 void opcontrol()
 {
-	double timeStart = pros::millis();
+	double timeStart = millis();
 	bool rumbled15s = false;
 	bool rumbled30s = false;
 	lv_obj_t *lRange = lv_label_create(lv_scr_act(), nullptr);
 	lv_obj_t *rRange = lv_label_create(lv_scr_act(), nullptr);
+	lv_obj_set_pos(rRange, 0, 100);
 	while (true)
 	{
-		if (pros::millis() % 2 == 0)
-		{
-			lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
-			lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
-		}
+		lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
+		lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
 		//Intake/outtake with L/R triggers
-		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
+		if (puppeteer.get_digital(E_CONTROLLER_DIGITAL_L1))
 		{
 			Intake.move(127);
 		}
-		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
+		else if (puppeteer.get_digital(E_CONTROLLER_DIGITAL_L2))
 		{
 			Intake.move(-127);
 		}
@@ -257,19 +255,19 @@ void opcontrol()
 		//DR4B: move w/ up/down directional buttons
 		//If the two sides become offset, the side that is ahead slows down to compensate.
 		DR4BOffset = DR4BL.get_position() - DR4BR.get_position();
-		if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
+		if (puppeteer.get_digital(E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
 
 			DR4BL.move(std::min((127 + DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
 			DR4BR.move(std::min((127 - DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
 		}
-		else if (puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_R1))
+		else if (puppeteer.get_digital(E_CONTROLLER_DIGITAL_R1))
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, -127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(std::max((-64 - DR4BOffset), -64.0));
-			DR4BR.move(std::max((-64 + DR4BOffset), -64.0));
+			DR4BL.move(std::max((-64 + DR4BOffset), -64.0) * (slowedMovement ? 0.5 : 1));
+			DR4BR.move(std::min((-64 - DR4BOffset), -64.0) * (slowedMovement ? 0.5 : 1));
 		}
 		else
 		{
@@ -286,8 +284,8 @@ void opcontrol()
 		}
 
 		//Drive: Arcade drive split on two sticks: forward/back on left, turning on right
-		leftPower = sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + 127] + sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X) + 127];
-		rightPower = sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y) + 127] - sigmoid_map[puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X) + 127];
+		leftPower = sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_Y) + 127] + sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_RIGHT_X) + 127];
+		rightPower = sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_Y) + 127] - sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_RIGHT_X) + 127];
 
 		driveFR.move(rightPower * (slowedMovement ? 0.5 : 1));
 		driveBR.move(rightPower * (slowedMovement ? 0.5 : 1));
@@ -296,21 +294,21 @@ void opcontrol()
 		driveBL.move(leftPower * (slowedMovement ? 0.5 : 1));
 
 		//H-drive on horizontal axis of left control stick
-		driveH.move(puppeteer.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X) * (slowedMovement ? 0.5 : 1));
+		driveH.move(puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_X) * (slowedMovement ? 0.5 : 1));
 		//Rumble at 30s remaining
-		if (pros::millis() - timeStart > 75 * 1000 && !rumbled30s)
+		if (millis() - timeStart > 75 * 1000 && !rumbled30s)
 		{
 			puppeteer.rumble("- - -");
 			rumbled30s = true;
 		}
 
 		//Rumble at 15s remaining
-		if (pros::millis() - timeStart > 90 * 1000 && !rumbled15s)
+		if (millis() - timeStart > 90 * 1000 && !rumbled15s)
 		{
 			puppeteer.rumble(".. .. ..");
 			rumbled15s = true;
 		}
-		slowedMovement = puppeteer.get_digital(pros::E_CONTROLLER_DIGITAL_A);
-		pros::delay(POLL_RATE);
+		slowedMovement = puppeteer.get_digital(E_CONTROLLER_DIGITAL_A);
+		delay(POLL_RATE);
 	}
 }
