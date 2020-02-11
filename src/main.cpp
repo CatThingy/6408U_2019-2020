@@ -8,7 +8,6 @@ const float POLL_RATE = 20.0;
 Controller puppeteer(E_CONTROLLER_MASTER);
 
 //Drive motors
-
 Motor driveH(15, E_MOTOR_GEARSET_18, true, E_MOTOR_ENCODER_DEGREES);
 Motor driveFR(14, E_MOTOR_GEARSET_18, true, E_MOTOR_ENCODER_DEGREES);
 Motor driveFL(13, E_MOTOR_GEARSET_18, false, E_MOTOR_ENCODER_DEGREES);
@@ -32,8 +31,8 @@ int rightPower = 0;
 int sigmoid_map[255] = {-100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -98, -98, -98, -98, -98, -98, -97, -97, -97, -96, -96, -96, -95, -95, -94, -94, -93, -92, -92, -91, -90, -89, -88, -86, -85, -84, -82, -80, -79, -77, -75, -73, -70, -68, -66, -63, -61, -58, -55, -52, -50, -47, -44, -41, -39, -36, -34, -31, -29, -27, -24, -22, -21, -19, -17, -16, -14, -13, -12, -10, -9, -8, -8, -7, -6, -5, -5, -4, -4, -3, -3, -3, -2, -2, -2, -2, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 16, 17, 19, 21, 22, 24, 27, 29, 31, 34, 36, 39, 41, 44, 47, 50, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 80, 82, 84, 85, 86, 88, 89, 90, 91, 92, 92, 93, 94, 94, 95, 95, 96, 96, 96, 97, 97, 97, 98, 98, 98, 98, 98, 98, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 
 //DR4B motors
-Motor DR4BL(18, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
-Motor DR4BR(17, E_MOTOR_GEARSET_36, false, E_MOTOR_ENCODER_DEGREES);
+Motor DR4BL(4, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
+Motor DR4BR(3, E_MOTOR_GEARSET_36, false, E_MOTOR_ENCODER_DEGREES);
 const double DR4B_ACCEL = 10.0;
 const double DR4B_MAX = 595.0;
 double DR4BOffset = 0;
@@ -43,8 +42,12 @@ double DR4BVelocity = 0;
 Motor Intake(2, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
 
 //Sensors
-ADIUltrasonic rangeL('A', 'B');
-ADIUltrasonic rangeR('C', 'D');
+// ADIUltrasonic rangeL('A', 'B');
+// ADIUltrasonic rangeR('C', 'D');
+
+//UI
+lv_obj_t *lRange = lv_label_create(lv_scr_act(), nullptr);
+lv_obj_t *rRange = lv_label_create(lv_scr_act(), nullptr);
 
 //Helper functions
 template <class T>
@@ -141,6 +144,57 @@ void PIDMove(double leftAmt, double rightAmt, double rpm, double tolerance, int 
 	driveBR.move(0);
 	driveBL.move(0);
 }
+
+/** Moves a certain amount forward using ultrasonic rangefinders and a PID controller
+ * \param amt Ultrasonic sensor units to move
+ * \param rpm Max RPM to spin the wheels
+ * \param tolerance Maximum acceptable rangefinder error
+ * \param targetTicks Amount of time the measurement have to be within the error
+ * \param kPRange kP for drive motors
+ * \param kIRange kI for drive motors
+ * \param kDRange kD for drive motors
+//  */
+// void PIDDriveForward(double amt, double rpm, double tolerance, int targetTicks, double kPRange, double kIRange = 0, double kDRange = 0)
+// {
+// 	double lTarget = rangeL.get_value() + amt;
+// 	double rTarget = rangeR.get_value() + amt;
+
+// 	double lDerivative = 0;
+// 	double rDerivative = 0;
+
+// 	double lPrevError = 0;
+// 	double rPrevError = 0;
+
+// 	int ticksAtTarget = 0;
+
+// 	bool atTarget = false;
+
+// 	while (!atTarget && ticksAtTarget <= targetTicks)
+// 	{
+// 		lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
+// 		lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
+
+// 		driveFR.move_velocity(limitAbs(PID(rTarget, driveFR.get_position(), lDerivative, lPrevError, kPRange), rpm));
+// 		driveFL.move_velocity(limitAbs(PID(lTarget, driveFL.get_position(), rDerivative, rPrevError, kPRange), rpm));
+// 		driveBR.move_velocity(limitAbs(PID(rTarget, driveBR.get_position(), lDerivative, lPrevError, kPRange), rpm));
+// 		driveBL.move_velocity(limitAbs(PID(lTarget, driveBL.get_position(), rDerivative, rPrevError, kPRange), rpm));
+
+// 		atTarget = (std::abs(driveFR.get_position() - rTarget) < tolerance) && (std::abs(driveFL.get_position() - lTarget) < tolerance) && (std::abs(driveBR.get_position() - rTarget) < tolerance) && (std::abs(driveBL.get_position() - lTarget) < tolerance);
+// 		if (atTarget)
+// 		{
+// 			ticksAtTarget++;
+// 		}
+// 		else
+// 		{
+// 			ticksAtTarget = 0;
+// 		}
+// 		delay(POLL_RATE);
+// 	}
+// 	driveFR.move(0);
+// 	driveFL.move(0);
+// 	driveBR.move(0);
+// 	driveBL.move(0);
+// }
 #pragma endregion
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -164,6 +218,9 @@ void initialize()
 
 	//Intake set to hold - prevent cubes from being forced out
 	Intake.set_brake_mode(MOTOR_BRAKE_HOLD);
+
+	//Separate UI elements
+	lv_obj_set_pos(rRange, 0, 100);
 }
 
 /**
@@ -197,7 +254,7 @@ void competition_initialize() {}
  */
 void autonomous()
 {
-	//One-point auto
+	// One-point auto
 	driveBL.move_velocity(-200);
 	driveBR.move_velocity(-200);
 	driveFL.move_velocity(-200);
@@ -208,10 +265,14 @@ void autonomous()
 	driveFL.move_velocity(200);
 	driveFR.move_velocity(200);
 	delay(1000);
-	driveBL.move_velocity(-0);
+	driveBL.move_velocity(0);
 	driveBR.move_velocity(0);
 	driveFL.move_velocity(0);
 	driveFR.move_velocity(0);
+	// lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
+	// lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
+
+	// PIDDriveForward(200, 150, 10, 5, 3.0);
 }
 
 /**
@@ -232,13 +293,11 @@ void opcontrol()
 	double timeStart = millis();
 	bool rumbled15s = false;
 	bool rumbled30s = false;
-	lv_obj_t *lRange = lv_label_create(lv_scr_act(), nullptr);
-	lv_obj_t *rRange = lv_label_create(lv_scr_act(), nullptr);
-	lv_obj_set_pos(rRange, 0, 100);
+
 	while (true)
 	{
-		lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
-		lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
+		// lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
+		// lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
 		//Intake/outtake with L/R triggers
 		if (puppeteer.get_digital(E_CONTROLLER_DIGITAL_L1))
 		{
@@ -266,8 +325,8 @@ void opcontrol()
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, -127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(std::max((-64 + DR4BOffset), -64.0) * (slowedMovement ? 0.5 : 1));
-			DR4BR.move(std::min((-64 - DR4BOffset), -64.0) * (slowedMovement ? 0.5 : 1));
+			DR4BL.move(std::max((-64 - DR4BOffset), -64.0) * (slowedMovement ? 0.5 : 1));
+			DR4BR.move(std::max((-64 + DR4BOffset), -64.0) * (slowedMovement ? 0.5 : 1));
 		}
 		else
 		{
