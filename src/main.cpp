@@ -97,12 +97,12 @@ double PID(const double SETPOINT, const double SENSOR_VALUE, double &integral, d
  * \param RIGHT_AMT Number of degrees to turn the right wheels
  * \param RPM Max RPM to spin the wheels at
  * \param TOLERANCE Maximum acceptable error in degrees
- * \param TARGET_TICKS Amount of time the wheels have to be within the tolerance
+ * \param TARGET_TIME Amount of time the wheels have to be within the tolerance in ms
  * \param KP_DRIVE kP for drive motors
  * \param KI_DRIVE kI for drive motors
  * \param KD_DRIVE kD for drive motors
  */
-void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, const double TOLERANCE, const int TARGET_TICKS, const double KP_DRIVE, const double KI_DRIVE = 0, const double KD_DRIVE = 0)
+void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, const double TOLERANCE, const int TARGET_TIME, const double KP_DRIVE, const double KI_DRIVE = 0, const double KD_DRIVE = 0)
 {
 	const double FR_TARGET = driveFR.get_position() + RIGHT_AMT;
 	const double FL_TARGET = driveFL.get_position() + LEFT_AMT;
@@ -120,8 +120,8 @@ void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, co
 	double BLPrevError = 0;
 
 	bool atTarget = false;
-	int ticksAtTarget = 0;
-	while (!atTarget && ticksAtTarget <= TARGET_TICKS)
+	int timeAtTarget = 0;
+	while (!atTarget && timeAtTarget <= TARGET_TIME)
 	{
 		driveFR.move_velocity(limitAbs(PID(FR_TARGET, driveFR.get_position(), FRDerivative, FRPrevError, KP_DRIVE), RPM));
 		driveFL.move_velocity(limitAbs(PID(FL_TARGET, driveFL.get_position(), FLDerivative, FLPrevError, KP_DRIVE), RPM));
@@ -131,11 +131,11 @@ void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, co
 		atTarget = (std::abs(driveFR.get_position() - FR_TARGET) < TOLERANCE) && (std::abs(driveFL.get_position() - FL_TARGET) < TOLERANCE) && (std::abs(driveBR.get_position() - BR_TARGET) < TOLERANCE) && (std::abs(driveBL.get_position() - BL_TARGET) < TOLERANCE);
 		if (atTarget)
 		{
-			ticksAtTarget++;
+			timeAtTarget += POLL_RATE;
 		}
 		else
 		{
-			ticksAtTarget = 0;
+			timeAtTarget = 0;
 		}
 		delay(POLL_RATE);
 	}
@@ -149,12 +149,12 @@ void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, co
  * \param AMT Ultrasonic sensor units to move
  * \param RPM Max RPM to spin the wheels
  * \param TOLERANCE Maximum acceptable rangefinder error
- * \param TARGET_TICKS Amount of time the measurement have to be within the error
+ * \param TARGET_TICKS Amount of time the measurement have to be within the error in ms
  * \param KP_RANGE kP for drive motors
  * \param KI_RANGE kI for drive motors
  * \param KD_RANGE kD for drive motors
  */
-void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE, const int TARGET_TICKS, const double KP_RANGE, const double KI_RANGE = 0, const double KD_RANGE = 0)
+void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE, const double TARGET_TIME, const double KP_RANGE, const double KI_RANGE = 0, const double KD_RANGE = 0)
 {
 	const double L_TARGET = rangeL.get_value() + AMT;
 	const double R_TARGET = rangeR.get_value() + AMT;
@@ -165,11 +165,11 @@ void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE,
 	double lPrevError = 0;
 	double rPrevError = 0;
 
-	int ticksAtTarget = 0;
+	int timeAtTarget = 0;
 
 	bool atTarget = false;
 
-	while (!atTarget && ticksAtTarget <= TARGET_TICKS)
+	while (!atTarget && timeAtTarget <= TARGET_TIME)
 	{
 		lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
 		lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
@@ -182,11 +182,11 @@ void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE,
 		atTarget = (std::abs(rangeR.get_value() - R_TARGET) < TOLERANCE) && (std::abs(rangeL.get_value() - L_TARGET) < TOLERANCE);
 		if (atTarget)
 		{
-			ticksAtTarget++;
+			timeAtTarget+= POLL_RATE;
 		}
 		else
 		{
-			ticksAtTarget = 0;
+			timeAtTarget = 0;
 		}
 		delay(POLL_RATE);
 	}
@@ -273,7 +273,7 @@ void autonomous()
 	// lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
 	// lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
 
-	PIDDriveForward(300, 100, 5, 3, 1.0, 0.0, -0.5);
+	PIDDriveForward(300, 100, 5, 150, 1.0, 0.0, -0.5);
 }
 
 /**
