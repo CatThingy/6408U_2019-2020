@@ -42,8 +42,8 @@ double DR4BVelocity = 0;
 Motor Intake(2, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
 
 //Sensors
-// ADIUltrasonic rangeL('A', 'B');
-// ADIUltrasonic rangeR('C', 'D');
+ADIUltrasonic rangeL(1, 2);
+ADIUltrasonic rangeR(3, 4);
 
 //UI
 lv_obj_t *lRange = lv_label_create(lv_scr_act(), nullptr);
@@ -76,38 +76,38 @@ T lerp(T a, T b, T w)
 }
 
 //Generalized PID controller
-double PID(double setpoint, double sensorValue, double &integral, double &prevError, double kP, double kI = 0, double kD = 0)
+double PID(const double SETPOINT, const double SENSOR_VALUE, double &integral, double &prevError, const double KP, const double KI = 0, const double KD = 0)
 {
-	double error = setpoint - sensorValue;
+	const double ERROR = SETPOINT - SENSOR_VALUE;
 	double derivative = 0;
 
-	if (kD != 0)
+	if (KD != 0)
 	{
-		derivative = error - prevError;
+		derivative = ERROR - prevError;
 	}
-	if (kI != 0)
+	if (KI != 0)
 	{
-		integral += error;
+		integral += ERROR;
 	}
-	prevError = error;
-	return (error * kP) + (integral * kI) + (derivative * kP);
+	prevError = ERROR;
+	return (ERROR * KP) + (integral * KI) + (derivative * KP);
 }
 /** Moves a certain amount of degrees for left and right using a PID controller
- * \param leftAmt Number of degrees to turn the left wheels
- * \param rightAmt Number of degrees to turn the right wheels
- * \param rpm Max RPM to spin the wheels at
- * \param tolerance Maximum acceptable error in degrees
- * \param targetTicks Amount of time the wheels have to be within the tolerance
- * \param kPDrive kP for drive motors
- * \param kIDrive kI for drive motors
- * \param kDDrive kD for drive motors
+ * \param LEFT_AMT Number of degrees to turn the left wheels
+ * \param RIGHT_AMT Number of degrees to turn the right wheels
+ * \param RPM Max RPM to spin the wheels at
+ * \param TOLERANCE Maximum acceptable error in degrees
+ * \param TARGET_TICKS Amount of time the wheels have to be within the tolerance
+ * \param KP_DRIVE kP for drive motors
+ * \param KI_DRIVE kI for drive motors
+ * \param KD_DRIVE kD for drive motors
  */
-void PIDMove(double leftAmt, double rightAmt, double rpm, double tolerance, int targetTicks, double kPDrive, double kIDrive = 0, double kDDrive = 0)
+void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, const double TOLERANCE, const int TARGET_TICKS, const double KP_DRIVE, const double KI_DRIVE = 0, const double KD_DRIVE = 0)
 {
-	double FRTarget = driveFR.get_position() + rightAmt;
-	double FLTarget = driveFL.get_position() + leftAmt;
-	double BRTarget = driveBR.get_position() + rightAmt;
-	double BLTarget = driveBL.get_position() + leftAmt;
+	const double FR_TARGET = driveFR.get_position() + RIGHT_AMT;
+	const double FL_TARGET = driveFL.get_position() + LEFT_AMT;
+	const double BR_TARGET = driveBR.get_position() + RIGHT_AMT;
+	const double BL_TARGET = driveBL.get_position() + LEFT_AMT;
 
 	double FRDerivative = 0;
 	double FLDerivative = 0;
@@ -121,14 +121,14 @@ void PIDMove(double leftAmt, double rightAmt, double rpm, double tolerance, int 
 
 	bool atTarget = false;
 	int ticksAtTarget = 0;
-	while (!atTarget && ticksAtTarget <= targetTicks)
+	while (!atTarget && ticksAtTarget <= TARGET_TICKS)
 	{
-		driveFR.move_velocity(limitAbs(PID(FRTarget, driveFR.get_position(), FRDerivative, FRPrevError, kPDrive), rpm));
-		driveFL.move_velocity(limitAbs(PID(FLTarget, driveFL.get_position(), FLDerivative, FLPrevError, kPDrive), rpm));
-		driveBR.move_velocity(limitAbs(PID(BRTarget, driveBR.get_position(), BRDerivative, BRPrevError, kPDrive), rpm));
-		driveBL.move_velocity(limitAbs(PID(BLTarget, driveBL.get_position(), BLDerivative, BLPrevError, kPDrive), rpm));
+		driveFR.move_velocity(limitAbs(PID(FR_TARGET, driveFR.get_position(), FRDerivative, FRPrevError, KP_DRIVE), RPM));
+		driveFL.move_velocity(limitAbs(PID(FL_TARGET, driveFL.get_position(), FLDerivative, FLPrevError, KP_DRIVE), RPM));
+		driveBR.move_velocity(limitAbs(PID(BR_TARGET, driveBR.get_position(), BRDerivative, BRPrevError, KP_DRIVE), RPM));
+		driveBL.move_velocity(limitAbs(PID(BL_TARGET, driveBL.get_position(), BLDerivative, BLPrevError, KP_DRIVE), RPM));
 
-		atTarget = (std::abs(driveFR.get_position() - FRTarget) < tolerance) && (std::abs(driveFL.get_position() - FLTarget) < tolerance) && (std::abs(driveBR.get_position() - BRTarget) < tolerance) && (std::abs(driveBL.get_position() - BLTarget) < tolerance);
+		atTarget = (std::abs(driveFR.get_position() - FR_TARGET) < TOLERANCE) && (std::abs(driveFL.get_position() - FL_TARGET) < TOLERANCE) && (std::abs(driveBR.get_position() - BR_TARGET) < TOLERANCE) && (std::abs(driveBL.get_position() - BL_TARGET) < TOLERANCE);
 		if (atTarget)
 		{
 			ticksAtTarget++;
@@ -146,55 +146,56 @@ void PIDMove(double leftAmt, double rightAmt, double rpm, double tolerance, int 
 }
 
 /** Moves a certain amount forward using ultrasonic rangefinders and a PID controller
- * \param amt Ultrasonic sensor units to move
- * \param rpm Max RPM to spin the wheels
- * \param tolerance Maximum acceptable rangefinder error
- * \param targetTicks Amount of time the measurement have to be within the error
- * \param kPRange kP for drive motors
- * \param kIRange kI for drive motors
- * \param kDRange kD for drive motors
-//  */
-// void PIDDriveForward(double amt, double rpm, double tolerance, int targetTicks, double kPRange, double kIRange = 0, double kDRange = 0)
-// {
-// 	double lTarget = rangeL.get_value() + amt;
-// 	double rTarget = rangeR.get_value() + amt;
+ * \param AMT Ultrasonic sensor units to move
+ * \param RPM Max RPM to spin the wheels
+ * \param TOLERANCE Maximum acceptable rangefinder error
+ * \param TARGET_TICKS Amount of time the measurement have to be within the error
+ * \param KP_RANGE kP for drive motors
+ * \param KI_RANGE kI for drive motors
+ * \param KD_RANGE kD for drive motors
+ */
+void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE, const int TARGET_TICKS, const double KP_RANGE, const double KI_RANGE = 0, const double KD_RANGE = 0)
+{
+	const double L_TARGET = rangeL.get_value() + AMT;
+	const double R_TARGET = rangeR.get_value() + AMT;
 
-// 	double lDerivative = 0;
-// 	double rDerivative = 0;
+	double lDerivative = 0;
+	double rDerivative = 0;
 
-// 	double lPrevError = 0;
-// 	double rPrevError = 0;
+	double lPrevError = 0;
+	double rPrevError = 0;
 
-// 	int ticksAtTarget = 0;
+	int ticksAtTarget = 0;
 
-// 	bool atTarget = false;
+	bool atTarget = false;
 
-// 	while (!atTarget && ticksAtTarget <= targetTicks)
-// 	{
-// 		lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
-// 		lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
+	while (!atTarget && ticksAtTarget <= TARGET_TICKS)
+	{
+		lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
+		lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
 
-// 		driveFR.move_velocity(limitAbs(PID(rTarget, driveFR.get_position(), lDerivative, lPrevError, kPRange), rpm));
-// 		driveFL.move_velocity(limitAbs(PID(lTarget, driveFL.get_position(), rDerivative, rPrevError, kPRange), rpm));
-// 		driveBR.move_velocity(limitAbs(PID(rTarget, driveBR.get_position(), lDerivative, lPrevError, kPRange), rpm));
-// 		driveBL.move_velocity(limitAbs(PID(lTarget, driveBL.get_position(), rDerivative, rPrevError, kPRange), rpm));
+		driveFR.move_velocity(limitAbs(PID(R_TARGET, rangeR.get_value(), lDerivative, lPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
+		driveFL.move_velocity(limitAbs(PID(L_TARGET, rangeL.get_value(), rDerivative, rPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
+		driveBR.move_velocity(limitAbs(PID(R_TARGET, rangeR.get_value(), lDerivative, lPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
+		driveBL.move_velocity(limitAbs(PID(L_TARGET, rangeL.get_value(), rDerivative, rPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
 
-// 		atTarget = (std::abs(driveFR.get_position() - rTarget) < tolerance) && (std::abs(driveFL.get_position() - lTarget) < tolerance) && (std::abs(driveBR.get_position() - rTarget) < tolerance) && (std::abs(driveBL.get_position() - lTarget) < tolerance);
-// 		if (atTarget)
-// 		{
-// 			ticksAtTarget++;
-// 		}
-// 		else
-// 		{
-// 			ticksAtTarget = 0;
-// 		}
-// 		delay(POLL_RATE);
-// 	}
-// 	driveFR.move(0);
-// 	driveFL.move(0);
-// 	driveBR.move(0);
-// 	driveBL.move(0);
-// }
+		atTarget = (std::abs(rangeR.get_value() - R_TARGET) < TOLERANCE) && (std::abs(rangeL.get_value() - L_TARGET) < TOLERANCE);
+		if (atTarget)
+		{
+			ticksAtTarget++;
+		}
+		else
+		{
+			ticksAtTarget = 0;
+		}
+		delay(POLL_RATE);
+	}
+	driveFR.move(0);
+	driveFL.move(0);
+	driveBR.move(0);
+	driveBL.move(0);
+}
+
 #pragma endregion
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -255,24 +256,24 @@ void competition_initialize() {}
 void autonomous()
 {
 	// One-point auto
-	driveBL.move_velocity(-200);
-	driveBR.move_velocity(-200);
-	driveFL.move_velocity(-200);
-	driveFR.move_velocity(-200);
-	delay(4000);
-	driveBL.move_velocity(200);
-	driveBR.move_velocity(200);
-	driveFL.move_velocity(200);
-	driveFR.move_velocity(200);
-	delay(1000);
-	driveBL.move_velocity(0);
-	driveBR.move_velocity(0);
-	driveFL.move_velocity(0);
-	driveFR.move_velocity(0);
+	// driveBL.move_velocity(-200);
+	// driveBR.move_velocity(-200);
+	// driveFL.move_velocity(-200);
+	// driveFR.move_velocity(-200);
+	// delay(4000);
+	// driveBL.move_velocity(200);
+	// driveBR.move_velocity(200);
+	// driveFL.move_velocity(200);
+	// driveFR.move_velocity(200);
+	// delay(1000);
+	// driveBL.move_velocity(0);
+	// driveBR.move_velocity(0);
+	// driveFL.move_velocity(0);
+	// driveFR.move_velocity(0);
 	// lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
 	// lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
 
-	// PIDDriveForward(200, 150, 10, 5, 3.0);
+	PIDDriveForward(300, 100, 5, 3, 1.0, 0.0, -0.5);
 }
 
 /**
@@ -296,6 +297,9 @@ void opcontrol()
 
 	while (true)
 	{
+		lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
+		lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
+
 		// lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
 		// lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
 		//Intake/outtake with L/R triggers
@@ -343,9 +347,16 @@ void opcontrol()
 		}
 
 		//Drive: Arcade drive split on two sticks: forward/back on left, turning on right
-		leftPower = sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_Y) + 127] + sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_RIGHT_X) + 127];
-		rightPower = sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_Y) + 127] - sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_RIGHT_X) + 127];
-
+		if (!slowedMovement)
+		{
+			leftPower = sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_Y) + 127] + sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_RIGHT_X) + 127];
+			rightPower = sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_Y) + 127] - sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_RIGHT_X) + 127];
+		}
+		else
+		{
+			leftPower = lerp(float(leftPower), float(sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_Y) + 127] + sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_RIGHT_X) + 127]), 1 - (1 / POLL_RATE));
+			rightPower = lerp(float(rightPower), float(sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_LEFT_Y) + 127] - sigmoid_map[puppeteer.get_analog(E_CONTROLLER_ANALOG_RIGHT_X) + 127]), 1 - (1 / POLL_RATE));
+		}
 		driveFR.move(rightPower * (slowedMovement ? 0.5 : 1));
 		driveBR.move(rightPower * (slowedMovement ? 0.5 : 1));
 
