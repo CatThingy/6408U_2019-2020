@@ -1,6 +1,5 @@
 #include "main.h"
-using namespace pros;
-#pragma region "Definitions"
+#pragma region Definitions
 //Polling rate - used for calculations for gentler DR4B/drive
 const float POLL_RATE = 20.0;
 
@@ -48,25 +47,32 @@ ADIUltrasonic rangeR(3, 4);
 //UI
 lv_obj_t *lRange = lv_label_create(lv_scr_act(), nullptr);
 lv_obj_t *rRange = lv_label_create(lv_scr_act(), nullptr);
+#pragma endregion
 
-//Helper functions
+#pragma region Helper functions
 template <class T>
 T limitAbs(T n, T max)
 {
-	T sign;
 	if (n > 0)
 	{
-		sign = 1;
+		if (n > max)
+		{
+			return max;
+		}
+		return n;
 	}
 	else if (n < 0)
 	{
-		sign = -1;
+		if (n < -max)
+		{
+			return -max;
+		}
+		return n;
 	}
 	else
 	{
 		return 0;
 	}
-	return std::min(max, std::abs(n)) * sign;
 }
 
 template <class T>
@@ -74,8 +80,19 @@ T lerp(T a, T b, T w)
 {
 	return a + w * (b - a);
 }
+#pragma endregion
 
-//Generalized PID controller
+#pragma region Autonomous helper functions
+/** Generalized PID controler for use with more specialized functions.
+ * \param SETPOINT Target sensor value used to calculate error
+ * \param SENSOR_VALUE Sensor value used to calculate error
+ * \param integral Variable used to store integral for future iterations
+ * \param prevError Variable used to store the previous error to calculate derivative for future iterations
+ * \param KP Proportional multiplier constant
+ * \param KI Integral multiplier constant
+ * \param KD Derivative multiplier constant
+ * \return Value to be passed to motors
+ */
 double PID(const double SETPOINT, const double SENSOR_VALUE, double &integral, double &prevError, const double KP, const double KI = 0, const double KD = 0)
 {
 	const double ERROR = SETPOINT - SENSOR_VALUE;
@@ -109,10 +126,10 @@ void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, co
 	const double BR_TARGET = driveBR.get_position() + RIGHT_AMT;
 	const double BL_TARGET = driveBL.get_position() + LEFT_AMT;
 
-	double FRDerivative = 0;
-	double FLDerivative = 0;
-	double BRDerivative = 0;
-	double BLDerivative = 0;
+	double FRIntegral = 0;
+	double FLIntegral = 0;
+	double BRIntegral = 0;
+	double FLIntegral = 0;
 
 	double FRPrevError = 0;
 	double FLPrevError = 0;
@@ -123,10 +140,10 @@ void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, co
 	int timeAtTarget = 0;
 	while (!atTarget && timeAtTarget <= TARGET_TIME)
 	{
-		driveFR.move_velocity(limitAbs(PID(FR_TARGET, driveFR.get_position(), FRDerivative, FRPrevError, KP_DRIVE), RPM));
-		driveFL.move_velocity(limitAbs(PID(FL_TARGET, driveFL.get_position(), FLDerivative, FLPrevError, KP_DRIVE), RPM));
-		driveBR.move_velocity(limitAbs(PID(BR_TARGET, driveBR.get_position(), BRDerivative, BRPrevError, KP_DRIVE), RPM));
-		driveBL.move_velocity(limitAbs(PID(BL_TARGET, driveBL.get_position(), BLDerivative, BLPrevError, KP_DRIVE), RPM));
+		driveFR.move_velocity(limitAbs(PID(FR_TARGET, driveFR.get_position(), FRIntegral, FRPrevError, KP_DRIVE), RPM));
+		driveFL.move_velocity(limitAbs(PID(FL_TARGET, driveFL.get_position(), FLIntegral, FLPrevError, KP_DRIVE), RPM));
+		driveBR.move_velocity(limitAbs(PID(BR_TARGET, driveBR.get_position(), BRIntegral, BRPrevError, KP_DRIVE), RPM));
+		driveBL.move_velocity(limitAbs(PID(BL_TARGET, driveBL.get_position(), FLIntegral, BLPrevError, KP_DRIVE), RPM));
 
 		atTarget = (std::abs(driveFR.get_position() - FR_TARGET) < TOLERANCE) && (std::abs(driveFL.get_position() - FL_TARGET) < TOLERANCE) && (std::abs(driveBR.get_position() - BR_TARGET) < TOLERANCE) && (std::abs(driveBL.get_position() - BL_TARGET) < TOLERANCE);
 		if (atTarget)
@@ -154,16 +171,20 @@ void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, co
  * \param KI_RANGE kI for drive motors
  * \param KD_RANGE kD for drive motors
  */
-void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE, const double TARGET_TIME, const double KP_RANGE, const double KI_RANGE = 0, const double KD_RANGE = 0)
+void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE, const double TARGET_TIME, const double KP_RANGE, const double KI_RANGE = 0, const double KD_RANGE = 0, const bool ABSOLUTE = false)
 {
-	const double L_TARGET = rangeL.get_value() + AMT;
-	const double R_TARGET = rangeR.get_value() + AMT;
+	const double L_TARGET = AMT + (ABSOLUTE ? 0 : rangeL.get_value());
+	const double R_TARGET = AMT + (ABSOLUTE ? 0 : rangeR.get_value());
 
-	double lDerivative = 0;
-	double rDerivative = 0;
+	double lIntegral = 0;
+	double rIntegral = 0;
 
 	double lPrevError = 0;
 	double rPrevError = 0;
+
+
+	double lPower = 0;
+	double rPower = 0;
 
 	int timeAtTarget = 0;
 
@@ -171,18 +192,20 @@ void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE,
 
 	while (!atTarget && timeAtTarget <= TARGET_TIME)
 	{
-		lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
-		lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
-
-		driveFR.move_velocity(limitAbs(PID(R_TARGET, rangeR.get_value(), lDerivative, lPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
-		driveFL.move_velocity(limitAbs(PID(L_TARGET, rangeL.get_value(), rDerivative, rPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
-		driveBR.move_velocity(limitAbs(PID(R_TARGET, rangeR.get_value(), lDerivative, lPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
-		driveBL.move_velocity(limitAbs(PID(L_TARGET, rangeL.get_value(), rDerivative, rPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
+		// lv_label_set_text(lRange, (std::to_string(lPrevError)).c_str());
+		// lv_label_set_text(rRange, (std::to_string(rPrevError)).c_str());
+		lPower = limitAbs(PID(L_TARGET, rangeL.get_value(), lIntegral, lPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM);
+		rPower = limitAbs(PID(R_TARGET, rangeR.get_value(), rIntegral, rPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM);
+		
+		driveFR.move_velocity(rPower);
+		driveFL.move_velocity(lPower);
+		driveBR.move_velocity(rPower);
+		driveBL.move_velocity(lPower);
 
 		atTarget = (std::abs(rangeR.get_value() - R_TARGET) < TOLERANCE) && (std::abs(rangeL.get_value() - L_TARGET) < TOLERANCE);
 		if (atTarget)
 		{
-			timeAtTarget+= POLL_RATE;
+			timeAtTarget += POLL_RATE;
 		}
 		else
 		{
@@ -196,6 +219,67 @@ void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE,
 	driveBL.move(0);
 }
 
+void intakeStack(const double EFF_THRESHOLD, const double ADJUST_TIME, const double MAX_TIME = -1, const double DR4B_TARGET = -40, const double DR4B_TOLERANCE = 1)
+{
+	double timeWasted = 0;
+
+	while ((timeWasted <= MAX_TIME) && (MAX_TIME > 0))
+	{
+		lv_label_set_text(lRange, (std::to_string(DR4BR.get_position())).c_str());
+
+		if (Intake.get_efficiency() < EFF_THRESHOLD && timeWasted > 1000)
+		{
+			Intake.move_velocity(-100);
+			delay(ADJUST_TIME);
+			timeWasted += ADJUST_TIME;
+		}
+		else
+		{
+			Intake.move_velocity(100);
+		}
+		timeWasted += POLL_RATE;
+		delay(POLL_RATE);
+	}
+	Intake.move_velocity(0);
+}
+
+void PIDDriveH(const double AMT, const double RPM, const double TOLERANCE, const double TARGET_TIME, const double KP_RANGE, const double KI_RANGE = 0, const double KD_RANGE = 0)
+{
+	const double L_TARGET = rangeL.get_value();
+	const double R_TARGET = rangeR.get_value();
+
+	const double H_TARGET = driveH.get_position() + AMT;
+
+	double lIntegral = 0;
+	double rIntegral = 0;
+
+	double lPrevError = 0;
+	double rPrevError = 0;
+
+	int timeAtTarget = 0;
+
+	bool atTarget = false;
+	while (!atTarget && timeAtTarget <= TARGET_TIME)
+	{
+
+		driveH.move_absolute(H_TARGET, RPM);
+		driveFR.move_velocity(limitAbs(PID(R_TARGET, rangeR.get_value(), lIntegral, lPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
+		driveFL.move_velocity(limitAbs(PID(L_TARGET, rangeL.get_value(), rIntegral, rPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
+		driveBR.move_velocity(limitAbs(PID(R_TARGET, rangeR.get_value(), lIntegral, lPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
+		driveBL.move_velocity(limitAbs(PID(L_TARGET, rangeL.get_value(), rIntegral, rPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM));
+
+		atTarget = abs(driveH.get_position() - H_TARGET) < TOLERANCE;
+		if (atTarget)
+		{
+			timeAtTarget += POLL_RATE;
+		}
+		else
+		{
+			timeAtTarget = 0;
+		}
+		delay(POLL_RATE);
+	}
+}
 #pragma endregion
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -256,24 +340,22 @@ void competition_initialize() {}
 void autonomous()
 {
 	// One-point auto
-	// driveBL.move_velocity(-200);
-	// driveBR.move_velocity(-200);
-	// driveFL.move_velocity(-200);
-	// driveFR.move_velocity(-200);
-	// delay(4000);
-	// driveBL.move_velocity(200);
-	// driveBR.move_velocity(200);
-	// driveFL.move_velocity(200);
-	// driveFR.move_velocity(200);
-	// delay(1000);
-	// driveBL.move_velocity(0);
-	// driveBR.move_velocity(0);
-	// driveFL.move_velocity(0);
-	// driveFR.move_velocity(0);
+	driveBL.move_velocity(-200);
+	driveBR.move_velocity(-200);
+	driveFL.move_velocity(-200);
+	driveFR.move_velocity(-200);
+	delay(4000);
+	driveBL.move_velocity(200);
+	driveBR.move_velocity(200);
+	driveFL.move_velocity(200);
+	driveFR.move_velocity(200);
+	delay(1000);
+	driveBL.move_velocity(0);
+	driveBR.move_velocity(0);
+	driveFL.move_velocity(0);
+	driveFR.move_velocity(0);
 	// lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
 	// lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
-
-	PIDDriveForward(300, 100, 5, 150, 1.0, 0.0, -0.5);
 }
 
 /**
@@ -318,19 +400,19 @@ void opcontrol()
 		//DR4B: move w/ up/down directional buttons
 		//If the two sides become offset, the side that is ahead slows down to compensate.
 		DR4BOffset = DR4BL.get_position() - DR4BR.get_position();
-		if (puppeteer.get_digital(E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
+		if (abs(DR4BOffset) < 30 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(std::min((127 + DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
-			DR4BR.move(std::min((127 - DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
+			DR4BL.move(limitAbs((100 + DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
+			DR4BR.move(limitAbs((100 - DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
 		}
-		else if (puppeteer.get_digital(E_CONTROLLER_DIGITAL_R1))
+		else if (abs(DR4BOffset) < 30 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R1))
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, -127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(std::max((-64 - DR4BOffset), -64.0) * (slowedMovement ? 0.5 : 1));
-			DR4BR.move(std::max((-64 + DR4BOffset), -64.0) * (slowedMovement ? 0.5 : 1));
+			DR4BL.move(limitAbs((-64 - DR4BOffset), 64.0) * (slowedMovement ? 0.5 : 1));
+			DR4BR.move(limitAbs((-64 + DR4BOffset), 64.0) * (slowedMovement ? 0.5 : 1));
 		}
 		else
 		{
