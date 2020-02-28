@@ -338,23 +338,81 @@ void competition_initialize() {}
  */
 void autonomous()
 {
-	// One-point auto
-	driveBL.move_velocity(-200);
-	driveBR.move_velocity(-200);
-	driveFL.move_velocity(-200);
-	driveFR.move_velocity(-200);
-	delay(4000);
-	driveBL.move_velocity(200);
-	driveBR.move_velocity(200);
-	driveFL.move_velocity(200);
-	driveFR.move_velocity(200);
-	delay(1000);
+#pragma region Fold out claw and align against the wall
+	driveBL.move_velocity(150);
+	driveBR.move_velocity(150);
+	driveFL.move_velocity(150);
+	driveFR.move_velocity(150);
+	delay(200);
+	driveBL.move_velocity(-150);
+	driveBR.move_velocity(-150);
+	driveFL.move_velocity(-150);
+	driveFR.move_velocity(-150);
+	delay(500);
 	driveBL.move_velocity(0);
 	driveBR.move_velocity(0);
 	driveFL.move_velocity(0);
 	driveFR.move_velocity(0);
-	// lv_label_set_text(lRange, (std::to_string(rangeL.get_value())).c_str());
-	// lv_label_set_text(rRange, (std::to_string(rangeR.get_value())).c_str());
+#pragma endregion
+
+#pragma region Pick up first cube
+	DR4BL.move_absolute(120, 100);
+	DR4BR.move_absolute(120, 100);
+	delay(500);
+	PIDDriveForward(90, 35, 5, 100, 0.7, 0.0, 0.3, true);
+	DR4BL.move_absolute(-50, 50);
+	DR4BR.move_absolute(-50, 50);
+	Intake.move_velocity(100);
+	delay(2000);
+	Intake.move_velocity(0);
+#pragma endregion
+
+#pragma region Pick up second cube
+	DR4BL.move_absolute(120, 100);
+	DR4BR.move_absolute(120, 100);
+	driveH.move_relative(960, 100);
+	delay(2000);
+	PIDDriveForward(90, 35, 5, 100, 0.7, 0.0, 0.3, true);
+
+	DR4BL.move_absolute(-50, 30);
+	DR4BR.move_absolute(-50, 30);
+	Intake.move_velocity(100);
+	delay(1500);
+	Intake.move_velocity(0);
+#pragma endregion
+
+#pragma region Score 3 points
+	DR4BL.move_absolute(120, 100);
+	DR4BR.move_absolute(120, 100);
+	PIDDriveForward(70, 35, 5, 100, 0.7, 0.0, 0.3, true);
+	delay(400);
+	driveBL.move_velocity(100);
+	driveBR.move_velocity(-80);
+	driveFL.move_velocity(100);
+	driveFR.move_velocity(-80);
+	delay(700);
+
+	driveBL.move_velocity(50);
+	driveBR.move_velocity(50);
+	driveFL.move_velocity(50);
+	driveFR.move_velocity(50);
+
+	delay(300);
+
+	DR4BL.move_absolute(-50, 30);
+	DR4BR.move_absolute(-50, 30);
+
+	driveBL.move_velocity(0);
+	driveBR.move_velocity(0);
+	driveFL.move_velocity(0);
+	driveFR.move_velocity(0);
+
+	delay(1000);
+	Intake.move_velocity(-100);
+	delay(500);
+	DR4BL.move_absolute(300, 30);
+	DR4BR.move_absolute(300, 30);
+#pragma endregion
 }
 
 /**
@@ -399,14 +457,14 @@ void opcontrol()
 		//DR4B: move w/ up/down directional buttons
 		//If the two sides become offset, the side that is ahead slows down to compensate.
 		DR4BOffset = DR4BL.get_position() - DR4BR.get_position();
-		if (abs(DR4BOffset) < 30 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
+		if (abs(DR4BOffset) < 70 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(limitAbs((100 + DR4BOffset), 127.0));
-			DR4BR.move(limitAbs((100 - DR4BOffset), 127.0));
+			DR4BL.move(limitAbs((120 + DR4BOffset), 127.0));
+			DR4BR.move(limitAbs((120 - DR4BOffset), 127.0));
 		}
-		else if (abs(DR4BOffset) < 30 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R1))
+		else if (abs(DR4BOffset) < 70 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R1))
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, -127, (POLL_RATE * DR4B_ACCEL));
 

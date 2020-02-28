@@ -1,7 +1,7 @@
 {
     "py/object": "pros.conductor.project.Project",
     "py/state": {
-        "project_name": "6408U_2019-2020",
+        "project_name": "BLUE_3P_6408U_2019-2020",
         "target": "v5",
         "templates": {
             "kernel": {
