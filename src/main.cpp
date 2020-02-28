@@ -7,7 +7,7 @@ const float POLL_RATE = 20.0;
 Controller puppeteer(E_CONTROLLER_MASTER);
 
 //Drive motors
-Motor driveH(15, E_MOTOR_GEARSET_18, true, E_MOTOR_ENCODER_DEGREES);
+Motor driveH(15, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
 Motor driveFR(14, E_MOTOR_GEARSET_18, true, E_MOTOR_ENCODER_DEGREES);
 Motor driveFL(13, E_MOTOR_GEARSET_18, false, E_MOTOR_ENCODER_DEGREES);
 Motor driveBR(12, E_MOTOR_GEARSET_18, true, E_MOTOR_ENCODER_DEGREES);
@@ -30,19 +30,19 @@ int rightPower = 0;
 int sigmoid_map[255] = {-100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -99, -98, -98, -98, -98, -98, -98, -97, -97, -97, -96, -96, -96, -95, -95, -94, -94, -93, -92, -92, -91, -90, -89, -88, -86, -85, -84, -82, -80, -79, -77, -75, -73, -70, -68, -66, -63, -61, -58, -55, -52, -50, -47, -44, -41, -39, -36, -34, -31, -29, -27, -24, -22, -21, -19, -17, -16, -14, -13, -12, -10, -9, -8, -8, -7, -6, -5, -5, -4, -4, -3, -3, -3, -2, -2, -2, -2, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 16, 17, 19, 21, 22, 24, 27, 29, 31, 34, 36, 39, 41, 44, 47, 50, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 80, 82, 84, 85, 86, 88, 89, 90, 91, 92, 92, 93, 94, 94, 95, 95, 96, 96, 96, 97, 97, 97, 98, 98, 98, 98, 98, 98, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 
 //DR4B motors
-Motor DR4BL(4, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
-Motor DR4BR(3, E_MOTOR_GEARSET_36, false, E_MOTOR_ENCODER_DEGREES);
+Motor DR4BL(5, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
+Motor DR4BR(4, E_MOTOR_GEARSET_36, false, E_MOTOR_ENCODER_DEGREES);
 const double DR4B_ACCEL = 10.0;
 const double DR4B_MAX = 595.0;
 double DR4BOffset = 0;
 double DR4BVelocity = 0;
 
 //Intake
-Motor Intake(2, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
+Motor Intake(3, E_MOTOR_GEARSET_36, true, E_MOTOR_ENCODER_DEGREES);
 
 //Sensors
-ADIUltrasonic rangeL(1, 2);
-ADIUltrasonic rangeR(3, 4);
+ADIUltrasonic rangeR(1, 2);
+ADIUltrasonic rangeL(3, 4);
 
 //UI
 lv_obj_t *lRange = lv_label_create(lv_scr_act(), nullptr);
@@ -129,7 +129,7 @@ void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, co
 	double FRIntegral = 0;
 	double FLIntegral = 0;
 	double BRIntegral = 0;
-	double FLIntegral = 0;
+	double BLIntegral = 0;
 
 	double FRPrevError = 0;
 	double FLPrevError = 0;
@@ -143,7 +143,7 @@ void PIDMove(const double LEFT_AMT, const double RIGHT_AMT, const double RPM, co
 		driveFR.move_velocity(limitAbs(PID(FR_TARGET, driveFR.get_position(), FRIntegral, FRPrevError, KP_DRIVE), RPM));
 		driveFL.move_velocity(limitAbs(PID(FL_TARGET, driveFL.get_position(), FLIntegral, FLPrevError, KP_DRIVE), RPM));
 		driveBR.move_velocity(limitAbs(PID(BR_TARGET, driveBR.get_position(), BRIntegral, BRPrevError, KP_DRIVE), RPM));
-		driveBL.move_velocity(limitAbs(PID(BL_TARGET, driveBL.get_position(), FLIntegral, BLPrevError, KP_DRIVE), RPM));
+		driveBL.move_velocity(limitAbs(PID(BL_TARGET, driveBL.get_position(), BLIntegral, BLPrevError, KP_DRIVE), RPM));
 
 		atTarget = (std::abs(driveFR.get_position() - FR_TARGET) < TOLERANCE) && (std::abs(driveFL.get_position() - FL_TARGET) < TOLERANCE) && (std::abs(driveBR.get_position() - BR_TARGET) < TOLERANCE) && (std::abs(driveBL.get_position() - BL_TARGET) < TOLERANCE);
 		if (atTarget)
@@ -182,7 +182,6 @@ void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE,
 	double lPrevError = 0;
 	double rPrevError = 0;
 
-
 	double lPower = 0;
 	double rPower = 0;
 
@@ -192,11 +191,11 @@ void PIDDriveForward(const double AMT, const double RPM, const double TOLERANCE,
 
 	while (!atTarget && timeAtTarget <= TARGET_TIME)
 	{
-		// lv_label_set_text(lRange, (std::to_string(lPrevError)).c_str());
-		// lv_label_set_text(rRange, (std::to_string(rPrevError)).c_str());
+		lv_label_set_text(lRange, (std::to_string(lPrevError)).c_str());
+		lv_label_set_text(rRange, (std::to_string(rPrevError)).c_str());
 		lPower = limitAbs(PID(L_TARGET, rangeL.get_value(), lIntegral, lPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM);
 		rPower = limitAbs(PID(R_TARGET, rangeR.get_value(), rIntegral, rPrevError, KP_RANGE, KI_RANGE, KD_RANGE), RPM);
-		
+
 		driveFR.move_velocity(rPower);
 		driveFL.move_velocity(lPower);
 		driveBR.move_velocity(rPower);
@@ -404,15 +403,15 @@ void opcontrol()
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(limitAbs((100 + DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
-			DR4BR.move(limitAbs((100 - DR4BOffset), 127.0) * (slowedMovement ? 0.5 : 1));
+			DR4BL.move(limitAbs((100 + DR4BOffset), 127.0));
+			DR4BR.move(limitAbs((100 - DR4BOffset), 127.0));
 		}
 		else if (abs(DR4BOffset) < 30 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R1))
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, -127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(limitAbs((-64 - DR4BOffset), 64.0) * (slowedMovement ? 0.5 : 1));
-			DR4BR.move(limitAbs((-64 + DR4BOffset), 64.0) * (slowedMovement ? 0.5 : 1));
+			DR4BL.move(limitAbs((-64 - DR4BOffset), 64.0));
+			DR4BR.move(limitAbs((-64 + DR4BOffset), 64.0));
 		}
 		else
 		{
@@ -460,7 +459,11 @@ void opcontrol()
 			puppeteer.rumble(".. .. ..");
 			rumbled15s = true;
 		}
-		slowedMovement = puppeteer.get_digital(E_CONTROLLER_DIGITAL_A);
+
+		if (puppeteer.get_digital_new_press(E_CONTROLLER_DIGITAL_A))
+		{
+			slowedMovement = !slowedMovement;
+		}
 		delay(POLL_RATE);
 	}
 }
