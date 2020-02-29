@@ -399,14 +399,14 @@ void opcontrol()
 		//DR4B: move w/ up/down directional buttons
 		//If the two sides become offset, the side that is ahead slows down to compensate.
 		DR4BOffset = DR4BL.get_position() - DR4BR.get_position();
-		if (abs(DR4BOffset) < 30 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
+		if (abs(DR4BOffset) < 70 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R2) && DR4BL.get_position() < DR4B_MAX && DR4BR.get_position() < DR4B_MAX)
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, 127, (POLL_RATE * DR4B_ACCEL));
 
-			DR4BL.move(limitAbs((100 + DR4BOffset), 127.0));
-			DR4BR.move(limitAbs((100 - DR4BOffset), 127.0));
+			DR4BL.move(limitAbs((120 + DR4BOffset), 127.0));
+			DR4BR.move(limitAbs((120 - DR4BOffset), 127.0));
 		}
-		else if (abs(DR4BOffset) < 30 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R1))
+		else if (abs(DR4BOffset) < 70 && puppeteer.get_digital(E_CONTROLLER_DIGITAL_R1))
 		{
 			// DR4BVelocity = lerp(DR4BVelocity, -127, (POLL_RATE * DR4B_ACCEL));
 
